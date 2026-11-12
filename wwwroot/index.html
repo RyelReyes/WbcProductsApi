@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Products - JWT Client</title>
+    <style>
+        :root {
+            --bg: #0b1120;
+            --card: #131c31;
+            --line: #23304d;
+            --text: #e2e8f0;
+            --muted: #8ba0c0;
+            --accent: #22d3ee;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", system-ui, sans-serif;
+            max-width: 780px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        h1 {
+            margin: 0 0 1rem;
+            color: var(--accent);
+            text-shadow: 0 0 18px rgba(34,211,238,.45);
+            letter-spacing: .02em;
+        }
+
+        h2 {
+            margin: 0 0 .75rem;
+            font-size: 1.05rem;
+            color: var(--muted);
+        }
+
+        section {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 1.1rem 1.25rem;
+            margin: 1rem 0;
+            box-shadow: 0 0 0 1px rgba(34,211,238,.04), 0 8px 24px rgba(0,0,0,.35);
+        }
+
+        input {
+            padding: .55rem .7rem;
+            margin: .2rem .3rem .2rem 0;
+            background: #0b1120;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+
+            input::placeholder {
+                color: #51658a;
+            }
+
+            input:focus {
+                outline: none;
+                border-color: var(--accent);
+                box-shadow: 0 0 0 3px rgba(34,211,238,.2);
+            }
+
+        button {
+            padding: .55rem 1rem;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--accent);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+        }
+
+            button:hover {
+                background: var(--accent);
+                color: #04222a;
+                box-shadow: 0 0 14px rgba(34,211,238,.5);
+            }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th {
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--muted);
+        }
+
+        th, td {
+            border-bottom: 1px solid var(--line);
+            padding: .55rem .4rem;
+            text-align: left;
+        }
+
+            td button {
+                border-color: #f43f5e;
+                color: #fb7185;
+                padding: .25rem .7rem;
+            }
+
+                td button:hover {
+                    background: #f43f5e;
+                    color: #fff;
+                    box-shadow: 0 0 12px rgba(244,63,94,.5);
+                }
+
+        .msg {
+            min-height: 1.2em;
+            font-size: .9rem;
+            margin: .5rem 0 0;
+        }
+
+        .ok {
+            color: #4ade80;
+        }
+
+        .err {
+            color: #fb7185;
+        }
+
+        #status {
+            background: #0f1830;
+            border: 1px solid var(--line);
+            padding: .6rem 1rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Products</h1>
+
+
+    <div id="status">
+        <span id="whoami">Not logged in</span>
+        <button id="logoutBtn" onclick="logout()" style="display:none">Logout</button>
+    </div>
+
+
+    <section>
+        <h2>Register</h2>
+        <form id="registerForm">
+            <input id="regUser" placeholder="Username" required />
+            <input id="regPass" type="password" placeholder="Password" required />
+            <button type="submit">Register</button>
+        </form>
+        <p id="regMsg" class="msg"></p>
+    </section>
+
+
+    <section>
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input id="logUser" placeholder="Username" required />
+            <input id="logPass" type="password" placeholder="Password" required />
+            <button type="submit">Login</button>
+        </form>
+        <p id="loginMsg" class="msg"></p>
+    </section>
+
+
+    <section>
+        <h2>Product list (public)</h2>
+        <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Price</th><th>Action</th></tr></thead>
+            <tbody id="productRows"></tbody>
+        </table>
+    </section>
+
+
+    <section>
+        <h2>Add product (Admin only)</h2>
+        <form id="addForm">
+            <input id="pName" placeholder="Name" required />
+            <input id="pPrice" type="number" step="0.01" placeholder="Price" required />
+            <button type="submit">Add</button>
+        </form>
+        <p id="addMsg" class="msg"></p>
+    </section>
+
+
+    <script>
+    // Same origin as the API (served from wwwroot). If you open this file with
+        // Live Server (:5500) instead, change BASE to "http://localhost:3000".
+        const BASE = "";
+
+
+        // ---------- helpers ----------
+        function decodeToken(token) {
+            try {
+                const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+                return JSON.parse(atob(b64));
+            } catch { return null; }
+        }
+
+
+        function showUser() {
+            const token = localStorage.getItem("token");
+            const claims = token ? decodeToken(token) : null;
+            const who = document.getElementById("whoami");
+            const btn = document.getElementById("logoutBtn");
+            if (claims) {
+                const name = claims.unique_name || claims.name ||
+                    claims["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"];
+                const role = claims.role ||
+                    claims["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+                who.textContent = "Logged in as " + name + " (" + role + ")";
+                btn.style.display = "inline-block";
+            } else {
+                who.textContent = "Not logged in";
+                btn.style.display = "none";
+            }
+        }
+
+
+        function setMsg(id, text, ok) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = "msg " + (ok ? "ok" : "err");
+        }
+
+
+        // ---------- authFetch: attaches the Bearer token, handles 401/403 in one place ----------
+        async function authFetch(url, options = {}) {
+            const token = localStorage.getItem("token");
+            options.headers = options.headers || {};
+            if (token) options.headers["Authorization"] = "Bearer " + token;
+
+
+            const res = await fetch(url, options);
+            if (res.status === 401) alert("Please log in again.");            // not authenticated
+            if (res.status === 403) alert("You are not allowed to do that."); // wrong role
+            return res;
+        }
+
+
+        // ---------- Register ----------
+        document.getElementById("registerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const res = await fetch(BASE + "/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: document.getElementById("regUser").value,
+                    password: document.getElementById("regPass").value
+                })
+            });
+            if (res.ok) setMsg("regMsg", "Registered - now log in.", true);
+            else setMsg("regMsg", "Register failed (" + res.status + ")", false);
+        });
+
+
+        // ---------- Login: store the token ----------
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const res = await fetch(BASE + "/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: document.getElementById("logUser").value,
+                    password: document.getElementById("logPass").value
+                })
+            });
+            if (!res.ok) { setMsg("loginMsg", "Login failed (" + res.status + ")", false); return; }
+            const data = await res.json();
+            localStorage.setItem("token", data.token);   // <-- the key step
+            setMsg("loginMsg", "Logged in ✓", true);
+            showUser();
+            loadAll();
+        });
+
+
+        // ---------- Logout ----------
+        function logout() {
+            localStorage.removeItem("token");
+            setMsg("loginMsg", "Logged out.", true);
+            showUser();
+            loadAll();
+        }
+
+
+        // ---------- Products ----------
+        async function loadAll() {
+            const res = await fetch(BASE + "/api/products");      // public, no token needed
+            const items = await res.json();
+            const body = document.getElementById("productRows");
+            body.innerHTML = "";
+            for (const p of items) {
+                const tr = document.createElement("tr");
+                const cells = [p.id, p.name, Number(p.price).toFixed(2)];
+                for (const c of cells) {
+                    const td = document.createElement("td");
+                    td.textContent = c;                 // textContent avoids XSS from product names
+                    tr.appendChild(td);
+                }
+                const act = document.createElement("td");
+                const del = document.createElement("button");
+                del.textContent = "Delete";
+                del.onclick = () => deleteProduct(p.id);
+                act.appendChild(del);
+                tr.appendChild(act);
+                body.appendChild(tr);
+            }
+        }
+
+
+        // Admin-only: Add (goes through authFetch)
+        async function addProduct(name, price) {
+            const res = await authFetch(BASE + "/api/products", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: name, price: Number(price) })
+            });
+            setMsg("addMsg", "POST /api/products -> " + res.status, res.ok);
+            if (res.ok) loadAll();
+        }
+
+
+        // Admin-only: Delete (goes through authFetch)
+        async function deleteProduct(id) {
+            const res = await authFetch(BASE + "/api/products/" + id, { method: "DELETE" });
+            setMsg("addMsg", "DELETE /api/products/" + id + " -> " + res.status, res.ok);
+            if (res.ok) loadAll();
+        }
+
+
+        document.getElementById("addForm").addEventListener("submit", (e) => {
+            e.preventDefault();
+            addProduct(document.getElementById("pName").value, document.getElementById("pPrice").value);
+            e.target.reset();
+        });
+
+
+        showUser();
+        loadAll();</script>
+</body>
+</html>
